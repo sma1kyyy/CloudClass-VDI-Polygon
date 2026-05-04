@@ -1,0 +1,7 @@
+Taskfile.yaml
+__pycache__/
+*.py[oc]
+.venv
+.env
+*.log
+/test
