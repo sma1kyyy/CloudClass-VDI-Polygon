@@ -551,13 +551,14 @@ cloudclass/
 │   ├── ip-plan.md               ← IP-таблица всех узлов
 │   ├── architecture.md          ← описание архитектуры
 │   └── screenshots/             ← скриншоты для отчёта
-├── configs/
-│   ├──       
-│   ├── proxmox1,2/
-│   │                
-│   └── docker/
-│            
-├── scripts/
+│
+├── proxmox/                     ← конфиги для настройки proxmox
+│
+├── docker/                      ← конфиги для docker-инфраструктуры
+│
+├── freebsd/                     ← конфиги и скрипты для freebsd
+│
+├── tests/                       ← линтеры, сценарии нагрузочного тестирования и скриптов
 │         
 └── ansible/                     ← (бонус) Ansible-playbook
 
