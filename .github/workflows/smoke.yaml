@@ -33,12 +33,28 @@ jobs:
         working-directory: docker
         run: |
           set -euo pipefail
+          pull_with_retry() {
+            local img="$1"
+            local attempts=6
+            local delay=5
+            for i in $(seq 1 $attempts); do
+              if docker pull --quiet "$img"; then
+                return 0
+              fi
+              if [ "$i" -lt "$attempts" ]; then
+                echo "::warning::pull failed for $img (attempt $i/$attempts), retry in ${delay}s"
+                sleep "$delay"
+                delay=$((delay * 2))
+              fi
+            done
+            echo "::error::pull failed for $img after $attempts attempts"
+            return 1
+          }
           for img in $(docker compose config --images); do
             echo "::group::pull $img"
-            docker pull --quiet "$img" &
+            pull_with_retry "$img"
+            echo "::endgroup::"
           done
-          wait
-          echo "::endgroup::"
 
       - name: docker compose up --wait
         working-directory: docker
