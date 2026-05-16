@@ -14,7 +14,6 @@ jobs:
     uses: ./.github/workflows/validate.yaml
 
   smoke:
-    needs: validate
     uses: ./.github/workflows/smoke.yaml
 
   integration:
