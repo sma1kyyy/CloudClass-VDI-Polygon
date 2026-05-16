@@ -1,8 +1,9 @@
-# tests/docker
+# tests/validate/docker
 
-Статические проверки (линтеры) для конфигов из каталога `docker/`. **Это не
-интеграционные тесты** — здесь ничего не запускается на прод-портах, не
-открываются сокеты, не загружаются образы целиком.
+Статические проверки (линтеры и валидаторы) для конфигов сервисов, которые
+поднимаются в контейнерах из каталога `docker/`. **Это не интеграционные
+тесты** — здесь ничего не запускается на прод-портах, не открываются сокеты,
+не загружаются образы целиком.
 
 ## Что проверяем
 
@@ -19,7 +20,7 @@
 ```bash
 python3 -m venv .venv
 . .venv/bin/activate
-pip install -r tests/docker/requirements.txt
+pip install -r tests/requirements.txt
 ```
 
 Опционально системные тулзы:
@@ -33,25 +34,25 @@ pip install -r tests/docker/requirements.txt
 Полный набор:
 
 ```bash
-pytest tests/docker/
+pytest tests/validate/docker/
 ```
 
 Только быстрые тесты (без docker):
 
 ```bash
-pytest tests/docker/ -m 'not docker'
+pytest tests/validate/docker/ -m 'not docker'
 ```
 
 Только docker-зависимые:
 
 ```bash
-pytest tests/docker/ -m docker
+pytest tests/validate/docker/ -m docker
 ```
 
 Один файл:
 
 ```bash
-pytest tests/docker/test_yaml_syntax.py -v
+pytest tests/validate/docker/test_yaml_syntax.py -v
 ```
 
 ## Маркеры

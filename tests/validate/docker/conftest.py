@@ -8,8 +8,8 @@ from pathlib import Path
 import pytest
 import yaml
 
-# tests/docker/conftest.py > repo root
-REPO_ROOT: Path = Path(__file__).resolve().parents[2]
+# tests/validate/docker/conftest.py > repo root
+REPO_ROOT: Path = Path(__file__).resolve().parents[3]
 DOCKER_DIR: Path = REPO_ROOT / "docker"
 
 
