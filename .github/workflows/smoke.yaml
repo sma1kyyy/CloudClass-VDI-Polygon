@@ -1,0 +1,84 @@
+name: smoke
+
+on:
+  workflow_call:
+
+jobs:
+
+  docker:
+    name: docker
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      POSTGRES_DB: smoke_db
+      POSTGRES_USER: smoke_user
+      POSTGRES_PASSWORD: smoke_pass
+      GUACAMOLE_VERSION: "1.5.5"
+      GUACAMOLE_PORT: "8080"
+      CODE_SERVER_PASSWORD: smoke_pass
+      GRAFANA_USER: admin
+      GRAFANA_PASSWORD: admin
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify Docker is available
+        run: |
+          docker version
+          docker compose version
+
+      - name: Pre-pull Docker images
+        working-directory: docker
+        run: |
+          set -euo pipefail
+          for img in $(docker compose config --images); do
+            echo "::group::pull $img"
+            docker pull --quiet "$img" &
+          done
+          wait
+          echo "::endgroup::"
+
+      - name: docker compose up --wait
+        working-directory: docker
+        run: |
+          set -euo pipefail
+          docker compose up -d --wait --wait-timeout 360 --remove-orphans
+
+      - name: Show compose ps
+        if: always()
+        working-directory: docker
+        run: docker compose ps
+
+      - name: Assert all services healthy
+        working-directory: docker
+        run: |
+          set -euo pipefail
+          status_json=$(docker compose ps --format json --all)
+          entries=$(echo "$status_json" | jq -s 'if (.[0] | type) == "array" then .[0] else . end')
+
+          echo "$entries" | jq -r '.[] | "\(.Service)\t\(.State)\t\(.Health // "-")"' \
+            | column -t -s $'\t'
+
+          bad_state=$(echo "$entries" | jq -r '.[] | select(.State != "running") | .Service')
+          if [ -n "$bad_state" ]; then
+            echo "::error::сервисы не в running: $bad_state"
+            exit 1
+          fi
+
+          bad_health=$(echo "$entries" | jq -r '.[] | select(.Health != "" and .Health != "healthy") | .Service')
+          if [ -n "$bad_health" ]; then
+            echo "::error::сервисы не healthy: $bad_health"
+            exit 1
+          fi
+
+      - name: Dump logs on failure
+        if: failure()
+        working-directory: docker
+        run: docker compose logs --tail 200 --no-color
+
+      - name: Tear down
+        if: always()
+        working-directory: docker
+        run: docker compose down -v --remove-orphans

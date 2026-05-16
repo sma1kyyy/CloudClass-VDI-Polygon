@@ -4,145 +4,25 @@ on:
   push:
   pull_request:
 
-# Чтобы новый push в ту же ветку отменял предыдущий запуск, а не копил очередь.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  docker-config:
-    name: validate/docker configs
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+  validate:
+    uses: ./.github/workflows/validate.yaml
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-          cache-dependency-path: tests/requirements.txt
+  smoke:
+    needs: validate
+    uses: ./.github/workflows/smoke.yaml
 
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r tests/requirements.txt
+  integration:
+    needs: smoke
+    if: false
+    uses: ./.github/workflows/integration.yaml
 
-      - name: Verify Docker is available
-        run: |
-          docker version
-          docker compose version
-
-      - name: Pre-pull Docker images
-        run: |
-          set -euo pipefail
-          for img in \
-            prom/prometheus:latest \
-            prom/alertmanager:latest \
-            balabit/syslog-ng:latest
-          do
-            echo "::group::pull $img"
-            docker pull --quiet "$img" &
-          done
-          wait
-          echo "::endgroup::"
-
-      - name: Run tests (validate/docker)
-        run: |
-          pytest tests/validate/docker/ -v --color=yes
-
-  smoke-docker:
-    name: smoke/docker (compose up + healthcheck)
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    env:
-      # Заглушки на переменные из .env.example — реальные значения для smoke
-      # не нужны, нам надо лишь чтобы compose не ругался на «variable is not set»
-      # и сервисы поднялись.
-      POSTGRES_DB: smoke_db
-      POSTGRES_USER: smoke_user
-      POSTGRES_PASSWORD: smoke_pass
-      GUACAMOLE_VERSION: "1.5.5"
-      GUACAMOLE_PORT: "8080"
-      CODE_SERVER_PASSWORD: smoke_pass
-      GRAFANA_USER: admin
-      GRAFANA_PASSWORD: admin
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Verify Docker is available
-        run: |
-          docker version
-          docker compose version
-
-      - name: Pre-pull Docker images (параллельно)
-        working-directory: docker
-        run: |
-          set -euo pipefail
-          # Парсим compose.yaml и тянем все image заранее, чтобы up --wait
-          # не считал pull в свой таймаут.
-          for img in $(docker compose config --images); do
-            echo "::group::pull $img"
-            docker pull --quiet "$img" &
-          done
-          wait
-          echo "::endgroup::"
-
-      - name: docker compose up --wait
-        working-directory: docker
-        run: |
-          set -euo pipefail
-          # --wait ждёт пока все сервисы перейдут в healthy (или running, если
-          # у сервиса нет healthcheck). --wait-timeout — потолок ожидания.
-          docker compose up -d --wait --wait-timeout 360 --remove-orphans
-
-      - name: Show compose ps
-        if: always()
-        working-directory: docker
-        run: docker compose ps
-
-      - name: Assert all services healthy
-        working-directory: docker
-        run: |
-          set -euo pipefail
-          # Все сервисы из compose должны быть в state=running. У сервисов
-          # с healthcheck — health=healthy. Падаем громко, если что-то не так.
-          status_json=$(docker compose ps --format json --all)
-          # Поддержка обоих форматов: JSON-array (Compose >= 2.21) и
-          # line-delimited JSON (раньше). jq -s . сложит всё в один массив.
-          entries=$(echo "$status_json" | jq -s 'if (.[0] | type) == "array" then .[0] else . end')
-
-          echo "$entries" | jq -r '.[] | "\(.Service)\t\(.State)\t\(.Health // "-")"' \
-            | column -t -s $'\t'
-
-          # bash: упасть, если есть сервис в не-running состоянии
-          bad_state=$(echo "$entries" | jq -r '.[] | select(.State != "running") | .Service')
-          if [ -n "$bad_state" ]; then
-            echo "::error::сервисы не в running: $bad_state"
-            exit 1
-          fi
-
-          # Все сервисы у нас с healthcheck — должны быть healthy.
-          bad_health=$(echo "$entries" | jq -r '.[] | select(.Health != "" and .Health != "healthy") | .Service')
-          if [ -n "$bad_health" ]; then
-            echo "::error::сервисы не healthy: $bad_health"
-            exit 1
-          fi
-
-      - name: Dump logs on failure
-        if: failure()
-        working-directory: docker
-        run: docker compose logs --tail 200 --no-color
-
-      - name: Tear down
-        if: always()
-        working-directory: docker
-        run: docker compose down -v --remove-orphans
-
-# TODO: добавить тесты для будущих конфигов и скриптов
+  e2e:
+    needs: integration
+    if: false
+    uses: ./.github/workflows/e2e.yaml
