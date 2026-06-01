@@ -1,0 +1,19 @@
+name: e2e
+
+on:
+  workflow_call:
+
+jobs:
+
+  docker:
+    name: docker
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: TODO
+        run: |
+          echo "::notice::TODO — end-to-end-тесты"
